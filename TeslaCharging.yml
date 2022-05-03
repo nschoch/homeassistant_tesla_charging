@@ -1,0 +1,92 @@
+alias: TeslaCharging
+description: Automatically set charging amperage during the day with net production
+#
+#trigger based on change in power production from Envoy integration
+#
+trigger:
+  - platform: state
+    entity_id: sensor.envoy_202142002082_current_power_production
+#
+#only run if the EV is plugged in and it's between 6am and 8pm
+#
+condition:
+  - type: is_plugged_in
+    condition: device
+    device_id: 274622938e02da4bc2fa04e6c4471950 
+    entity_id: binary_sensor.tesla_wall_connector_vehicle_connected
+    domain: binary_sensor
+  - condition: time
+    before: '20:00:00'
+    after: '06:00:00'
+action:
+  - alias: set variables
+    variables:
+      # Even if you set above the maximum, the vehicle will reset to your EV charging station maximum
+      default_charge_amps: '48'
+      # I use the HACS Tesla integration and the default online sensor to grab the vehicle ID. Replace "phystepnda" with your vehicle name.
+      vehicle_id_set: '{{ state_attr(''binary_sensor.phystepnda_online_sensor'', ''id'') }}'
+      # I use the production per the Envoy integration. Replace as appropriate with an integration for your solar hardware to get a production figure.
+      solar_production: '{{ states(''sensor.envoy_202142002082_current_power_production'') }}'
+      # I am reading from wall connector integration to estimate current charge draw. 
+      # If I could figure out how to execute GET commands using the Tesla API, I wouldn't need to interface with the wall connector.
+      tesla_wc_active_power: >-
+        {{ (states('sensor.tesla_wall_connector_phase_a_current')|float *
+        states('sensor.tesla_wall_connector_phase_a_voltage')|float) +
+        (states('sensor.tesla_wall_connector_phase_b_current')|float *
+        states('sensor.tesla_wall_connector_phase_b_voltage')|float) }}
+      # I use the consumption per the Envoy using their CT monitoring clamps. You could replace this with a static figure based on average usage. 
+      gross_consumption: '{{ states(''sensor.envoy_202142002082_current_power_consumption'') }}'
+      net_consumption: '{{ gross_consumption|float - tesla_wc_active_power }}'
+      # This assumes 240V
+      available_charge_amps: '{{ ( (solar_production|float - net_consumption|float)/240 - 1 ) | int }}'
+# I update helpers because I like seeing some of these calculations on my dashboard. You could simplify this by not updating helpers and keeping everything within this script.
+  - alias: update helper tesla_wc_active_power
+    service: input_number.set_value
+    target:
+      entity_id: input_number.tesla_wc_active_power
+    data:
+      value: '{{ tesla_wc_active_power }}'
+  - alias: update helper net consumption
+    service: input_number.set_value
+    target:
+      entity_id: input_number.net_consumption
+    data:
+      value: '{{ net_consumption }}'
+  - alias: update helper available solar charge amps
+    service: input_number.set_value
+    target:
+      entity_id: input_number.available_solar_charge_amps
+    data:
+      value: '{{ available_charge_amps }}'
+# Wake up the Tesla
+  - alias: wake Tesla
+    service: tesla_custom.api
+    data:
+      command: WAKE_UP
+      parameters:
+        path_vars:
+          vehicle_id: '{{ vehicle_id_set }}'
+# Set the default amps because there is no else condition, so first we reset to default in case the next condition fails.
+  - alias: set default charge amps
+    service: tesla_custom.api
+    data:
+      command: CHARGING_AMPS
+      parameters:
+        path_vars:
+          vehicle_id: '{{ vehicle_id_set }}'
+        charging_amps: '{{ default_charge_amps }}'
+# If the available charge amps are greater than 4 (i.e., 5 amps or more), set the Tesla charge level accordingly.
+  - condition: and
+    conditions:
+      - condition: numeric_state
+        entity_id: input_number.available_solar_charge_amps
+        above: 4
+  - alias: set charge amps
+    service: tesla_custom.api
+    data:
+      command: CHARGING_AMPS
+      parameters:
+        path_vars:
+          vehicle_id: '{{ vehicle_id_set }}'
+        charging_amps: '{{ available_charge_amps }}'
+mode: single
