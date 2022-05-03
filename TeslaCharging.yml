@@ -37,7 +37,7 @@ action:
       # I use the consumption per the Envoy using their CT monitoring clamps. You could replace this with a static figure based on average usage. 
       gross_consumption: '{{ states(''sensor.envoy_202142002082_current_power_consumption'') }}'
       net_consumption: '{{ gross_consumption|float - tesla_wc_active_power }}'
-      # This assumes 240V
+      # This assumes 240V, deducts 1 amp for cushion, and converts to an integer (the API only accepts integers for charge amps)
       available_charge_amps: '{{ ( (solar_production|float - net_consumption|float)/240 - 1 ) | int }}'
 # I update helpers because I like seeing some of these calculations on my dashboard. You could simplify this by not updating helpers and keeping everything within this script.
   - alias: update helper tesla_wc_active_power
