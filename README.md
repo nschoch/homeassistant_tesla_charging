@@ -5,11 +5,11 @@ I use this HomeAssistant automation script to set Tesla charge amps based on net
 This allows me to get the most value for my solar production under San Diego Gas & Electric's net metering plan.
 
 ## Requirements
-HomeAssistant
-HACS
-Tesla Wall Connector integrated into HomeAssistant
-Solar integration with HomeAssistant
-Tesla Custom Integration with API https://github.com/alandtse/tesla
+* HomeAssistant
+* HACS
+* Tesla Wall Connector integrated into HomeAssistant
+* Solar integration with HomeAssistant
+* Tesla Custom Integration with API https://github.com/alandtse/tesla
 
 ## Setup
 0. Install requirements.
