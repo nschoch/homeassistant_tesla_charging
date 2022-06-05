@@ -1,0 +1,44 @@
+alias: TeslaSolarUpdateVariables
+description: Only for reference when solar trigger isn't happening.
+trigger:
+  - platform: time_pattern
+    seconds: /5
+condition: []
+action:
+  - alias: set variables
+    variables:
+      vehicle_id_set: '{{ state_attr(''binary_sensor.phystepnda_online_sensor'', ''id'') }}'
+      solar_production: '{{ states(''sensor.envoy_202142002082_current_power_production'') }}'
+      tesla_wc_active_power: >-
+        {{ (states('sensor.tesla_wall_connector_phase_a_current')|float *
+        states('sensor.tesla_wall_connector_phase_a_voltage')|float) +
+        (states('sensor.tesla_wall_connector_phase_b_current')|float *
+        states('sensor.tesla_wall_connector_phase_b_voltage')|float) }}
+      gross_consumption: '{{ states(''sensor.envoy_202142002082_current_power_consumption'') }}'
+      net_consumption: '{{ gross_consumption|float - tesla_wc_active_power }}'
+      available_charge_amps: '{{ ( (solar_production|float - net_consumption|float)/240 - 1 ) | int }}'
+  - alias: update helper tesla_wc_active_power
+    service: input_number.set_value
+    target:
+      entity_id: input_number.tesla_wc_active_power
+    data:
+      value: '{{ tesla_wc_active_power }}'
+  - alias: update helper net consumption
+    service: input_number.set_value
+    target:
+      entity_id: input_number.net_consumption
+    data:
+      value: '{{ net_consumption }}'
+  - alias: update helper available solar charge amps
+    service: input_number.set_value
+    target:
+      entity_id: input_number.available_solar_charge_amps
+    data:
+      value: '{{ available_charge_amps }}'
+  - alias: update helper Tesla Id
+    service: input_text.set_value
+    target:
+      entity_id: input_text.tesla_id
+    data:
+      value: '{{ vehicle_id_set }}'
+mode: single
