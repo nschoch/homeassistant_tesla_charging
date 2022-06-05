@@ -1,0 +1,44 @@
+alias: TeslaSetChargeRatePerSolarProduction
+sequence:
+  - alias: set variables
+    variables:
+      vehicle_id: '{{ states(''input_text.tesla_id'') }}'
+  - if:
+      - alias: if charge amps above 4
+        condition: numeric_state
+        entity_id: input_number.available_solar_charge_amps
+        above: 4
+    then:
+      - alias: set charge amps
+        service: tesla_custom.api
+        data:
+          command: CHARGING_AMPS
+          parameters:
+            path_vars:
+              vehicle_id: '{{ vehicle_id }}'
+            charging_amps: '{{ states(''input_number.available_solar_charge_amps'')| int }}'
+      - alias: start charging
+        service: tesla_custom.api
+        data:
+          command: START_CHARGE
+          parameters:
+            path_vars:
+              vehicle_id: '{{ vehicle_id }}'
+    else:
+      - alias: stop charging
+        service: tesla_custom.api
+        data:
+          command: STOP_CHARGE
+          parameters:
+            path_vars:
+              vehicle_id: '{{ vehicle_id }}'
+      - alias: set default charge amps
+        service: tesla_custom.api
+        data:
+          command: CHARGING_AMPS
+          parameters:
+            path_vars:
+              vehicle_id: '{{ vehicle_id }}'
+            charging_amps: '{{ states(''input_number.tesla_default_charge_amps'')| int }}'
+mode: single
+icon: mdi:lightning-bolt-outline
