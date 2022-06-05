@@ -1,0 +1,22 @@
+alias: TeslaChargingScript
+description: Automatically set charging amperage during the day with net production
+trigger:
+  - platform: time_pattern
+    minutes: /1
+  - type: plugged_in
+    platform: device
+    device_id: 274622938e02da4bc2fa04e6c4471950
+    entity_id: binary_sensor.tesla_wall_connector_vehicle_connected
+    domain: binary_sensor
+condition:
+  - type: is_plugged_in
+    condition: device
+    device_id: 274622938e02da4bc2fa04e6c4471950
+    entity_id: binary_sensor.tesla_wall_connector_vehicle_connected
+    domain: binary_sensor
+  - condition: numeric_state
+    entity_id: input_number.tesla_wc_active_power
+    below: '11000'
+action:
+  - service: script.tesla_set_charge_rate_per_solar_production
+    data: {}
